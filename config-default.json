@@ -1,0 +1,27 @@
+{
+  "storage": "",
+  "reddit": {
+    "user": {
+      "userName": "REDDIT_USER_NAME",
+      "password": "REDDIT_PASSWORD",
+      "clientId": "REDDIT_APP_ID",
+      "clientSecret": "REDDIT_APP_SECRET"
+    },
+    "urls": {
+      "general": "https://www.reddit.com",
+      "oauth": "https://oauth.reddit.com",
+      "api": {
+        "general": "https://www.reddit.com/api/v1",
+        "oauth": "https://oauth.reddit.com/api/v1"
+      }
+    },
+    "subReddits": [
+      "wallpaper",
+      "wallpapers",
+      "animewallpaper",
+      "animevectorwallpapers",
+      "sentou",
+      "slashw"
+    ]
+  }
+}
