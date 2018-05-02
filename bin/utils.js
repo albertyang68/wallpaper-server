@@ -8,9 +8,16 @@ const writeFile = BPromise.promisify(require('fs').writeFile);
 const rename = BPromise.promisify(require('fs').rename);
 const readdir = BPromise.promisify(require('fs').readdir);
 const unlink = BPromise.promisify(require('fs').unlink);
+const readFile = BPromise.promisify(require('fs').readFile);
 
 
 // File Operation
+function readFromFile(filePath, options = 'utf8') {
+  return readFile(filePath, options)
+    .tap(() => console.log(`LOG readFromFile done ${filePath}`))
+    .catch(err => console.warn(`WARN readFromFile ${filePath} ${err}`));
+}
+
 function writeToFile(filePath, data, options = 'utf8') {
   return writeFile(filePath, data, options)
     .tap(() => console.log(`LOG writeToFile done ${filePath}`))
@@ -108,6 +115,7 @@ module.exports = {
   moveFile,
   readDir,
   deleteFile,
+  readFromFile,
   removeDir,
   requestAsync,
   isEmptyDir,
