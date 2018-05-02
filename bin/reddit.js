@@ -62,24 +62,36 @@ function downloadFile(url, dest, fileName) {
 // Move files from dir/temp to dir/resolution based on image res
 function relocateImages(dir, subReddits) {
   return BPromise
-    .each(subReddits, subReddit =>
-      utils.readDir(path.join(dir, subReddit, 'temp', 'normal'))
-        .map(fileName => utils.getResolutionPromise(path.join(dir, subReddit, 'temp', 'normal', fileName))
+    .each(subReddits, (subReddit) => {
+      const targetDir = path.join(dir, subReddit, 'temp', 'normal');
+      return utils.readDir(targetDir)
+        .map(fileName => utils.getResolutionPromise(path.join(targetDir, fileName))
           .tapCatch(err => console.error(`ERROR relocateImages getResolutionPromise ${err}`))
           .then(resolution => utils.findDestFolder(resolution.width, resolution.height, false))
           .tapCatch(err => console.error(`ERROR relocateImages findFolderFromRes ${err}`))
-          .then(destFolderName => utils.moveFile(path.join(dir, subReddit, 'temp', 'normal', fileName), path.join(dir, subReddit, destFolderName, fileName)))
+          .then(destFolderName =>
+            utils.moveFile(
+              path.join(targetDir, fileName),
+              path.join(dir, subReddit, destFolderName, fileName),
+            ))
           .tapCatch(err => console.error(`ERROR relocateImages renameAsync ${err}`)))
-        .catch(err => console.error(`ERROR relocateImages ${err}`)))
-    .each(subReddit =>
-      utils.readDir(path.join(dir, subReddit, 'temp', 'nsfw'))
-        .map(fileName => utils.getResolutionPromise(path.join(dir, subReddit, 'temp', 'nsfw', fileName))
+        .catch(err => console.error(`ERROR relocateImages ${err}`));
+    })
+    .each((subReddit) => {
+      const targetDir = path.join(dir, subReddit, 'temp', 'nsfw');
+      return utils.readDir(targetDir)
+        .map(fileName => utils.getResolutionPromise(path.join(targetDir, fileName))
           .tapCatch(err => console.error(`ERROR relocateImages getResolutionPromise ${err}`))
           .then(resolution => utils.findDestFolder(resolution.width, resolution.height, true))
           .tapCatch(err => console.error(`ERROR relocateImages findFolderFromRes ${err}`))
-          .then(destFolderName => utils.moveFile(path.join(dir, subReddit, 'temp', 'nsfw', fileName), path.join(dir, subReddit, destFolderName, fileName)))
+          .then(destFolderName =>
+            utils.moveFile(
+              path.join(targetDir, fileName),
+              path.join(dir, subReddit, destFolderName, fileName),
+            ))
           .tapCatch(err => console.error(`ERROR relocateImages renameAsync ${err}`)))
-        .catch(err => console.error(`ERROR relocateImages ${err}`)));
+        .catch(err => console.error(`ERROR relocateImages ${err}`));
+    });
 }
 
 function removeInvalidImg(home, subReddits) {
@@ -141,7 +153,7 @@ function writeLastResultId(home, subReddit, id) {
       return BPromise.resolve(prevRun);
     })
     .then((prevRun) => {
-      let modifiedRun = prevRun;
+      const modifiedRun = prevRun;
       modifiedRun[subReddit] = id;
       return BPromise.resolve(modifiedRun);
     })

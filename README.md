@@ -22,12 +22,18 @@ Version 0.2: (plan)
 ## Folder structure
 Wallpaper
   * reddit
-    * normal
       * 1920x1080
+        * normal
+        * nsfw
       * 2560x1440
+        * normal
+        * nsfw
       * large
+        * normal
+        * nsfw
       * other
-    * nsfw
+        * normal
+        * nsfw
 
 ## Known bug
 * Need to delete all existing folder if config.subReddits is modified
