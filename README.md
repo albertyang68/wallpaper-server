@@ -20,7 +20,7 @@ Version 0.2: (plan)
 * Web interface, ability to change source query and fetch time
 
 ## Folder structure
-Wallpaper
+wallpaper-server
   * reddit
       * 1920x1080
         * normal
@@ -36,4 +36,4 @@ Wallpaper
         * nsfw
 
 ## Known bug
-* Need to delete all existing folder if config.subReddits is modified
+* ~~Need to delete all existing folder if config.subReddits is modified~~(Fixed)

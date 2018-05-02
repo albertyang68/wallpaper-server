@@ -222,9 +222,7 @@ function redditSearch(home, token, query, subReddits) {
 
     return readLastResultId(home, subReddit)
       .then((id) => {
-        if (id) {
-          options.qs.after = id;
-        }
+        options.qs.after = id || '';
         return BPromise.resolve(options);
       })
       .then(modifiedOptions => new BPromise((resolve, reject) => {
