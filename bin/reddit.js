@@ -61,22 +61,41 @@ function downloadFile(url, dest, fileName) {
 
 // Move files from dir/temp to dir/resolution based on image res
 function relocateImages(dir, subReddits) {
-  return subReddits
-    .map(subReddit =>
-      utils.readDir(path.join(dir, subReddit, 'temp'))
-        .map(fileName => utils.getResolutionPromise(path.join(dir, subReddit, 'temp', fileName))
+  return BPromise
+    .each(subReddits, subReddit =>
+      utils.readDir(path.join(dir, subReddit, 'temp', 'normal'))
+        .map(fileName => utils.getResolutionPromise(path.join(dir, subReddit, 'temp', 'normal', fileName))
           .tapCatch(err => console.error(`ERROR relocateImages getResolutionPromise ${err}`))
-          .then(resolution => utils.findFolderFromRes(resolution.width, resolution.height))
+          .then(resolution => utils.findDestFolder(resolution.width, resolution.height, false))
           .tapCatch(err => console.error(`ERROR relocateImages findFolderFromRes ${err}`))
-          .then(destFolderName => utils.moveFile(path.join(dir, subReddit, 'temp', fileName), path.join(dir, subReddit, destFolderName, fileName)))
+          .then(destFolderName => utils.moveFile(path.join(dir, subReddit, 'temp', 'normal', fileName), path.join(dir, subReddit, destFolderName, fileName)))
+          .tapCatch(err => console.error(`ERROR relocateImages renameAsync ${err}`)))
+        .catch(err => console.error(`ERROR relocateImages ${err}`)))
+    .each(subReddit =>
+      utils.readDir(path.join(dir, subReddit, 'temp', 'nsfw'))
+        .map(fileName => utils.getResolutionPromise(path.join(dir, subReddit, 'temp', 'nsfw', fileName))
+          .tapCatch(err => console.error(`ERROR relocateImages getResolutionPromise ${err}`))
+          .then(resolution => utils.findDestFolder(resolution.width, resolution.height, true))
+          .tapCatch(err => console.error(`ERROR relocateImages findFolderFromRes ${err}`))
+          .then(destFolderName => utils.moveFile(path.join(dir, subReddit, 'temp', 'nsfw', fileName), path.join(dir, subReddit, destFolderName, fileName)))
           .tapCatch(err => console.error(`ERROR relocateImages renameAsync ${err}`)))
         .catch(err => console.error(`ERROR relocateImages ${err}`)));
 }
 
 function removeInvalidImg(home, subReddits) {
-  return subReddits
-    .map((subReddit) => {
-      const dir = path.join(home, subReddit, 'others');
+  return BPromise
+    .each(subReddits, (subReddit) => {
+      const dir = path.join(home, subReddit, 'others', 'normal');
+      return utils.readDir(dir)
+        .filter((fileName) => {
+          const resolution = utils.getResolution(path.join(dir, fileName));
+          return resolution.width === 161 && resolution.height === 81; // reddit invalid file
+        })
+        .each(invalidFileName => utils.deleteFile(path.join(dir, invalidFileName)))
+        .catch(err => console.error(`ERROR removeInvalidImg ${err}`));
+    })
+    .each((subReddit) => {
+      const dir = path.join(home, subReddit, 'others', 'nsfw');
       return utils.readDir(dir)
         .filter((fileName) => {
           const resolution = utils.getResolution(path.join(dir, fileName));
@@ -90,16 +109,16 @@ function removeInvalidImg(home, subReddits) {
 function getImgFromResults(dir, results) {
   const subRedditName = results.subReddit;
   return BPromise.map(results.sources, (result) => {
-    // True: reddit [{}]
-    // False: imgur {name, url}
+    // isArray: reddit [{url, width, height, nsfw}]
+    // isNotArray: imgur {name, url, nsfw}
     if (Array.isArray(result)) {
       return BPromise.map(result, source =>
-        utils.findFolderFromRes(source.width, source.height)
+        utils.findDestFolder(source.width, source.height, source.nsfw)
           .then(destFolder =>
             downloadFile(source.url, path.join(dir, subRedditName, destFolder), source.name))
           .tapCatch(err => console.error(`ERROR downloadFile ${err}`)));
     }
-    return downloadFile(result.url, path.join(dir, subRedditName, 'temp'), result.name)
+    return downloadFile(result.url, path.join(dir, subRedditName, 'temp', result.nsfw ? 'nsfw' : 'normal'), result.name)
       .catch((err) => {
         console.error(`ERROR getImgFromResults ${err}`);
       });
@@ -137,7 +156,7 @@ function readLastResultId(home, subReddit) {
       try {
         prevRun = JSON.parse(data);
       } catch (e) {
-        console.warn(e);
+        console.warn('WARN previous-run.json does not exist');
         return BPromise.resolve();
       }
       return BPromise.resolve(prevRun[subReddit]);
@@ -154,12 +173,13 @@ function parseSearchedChildren(home, subReddit, resultsPerReddit) {
     // Extract source from each images if from Reddit
     if (resultPerReddit.data.preview) {
       return BPromise.map(resultPerReddit.data.preview.images, image =>
-        BPromise.resolve(Object.assign(image.source, { name: resultPerReddit.data.name })));
+        BPromise.resolve(Object.assign(image.source, { name: resultPerReddit.data.name, nsfw: resultPerReddit.data.thumbnail === 'nsfw' })));
     }
     // Extract url from data if from other resources (eg. imgur)
     return BPromise.resolve({
       name: resultPerReddit.data.name,
       url: resultPerReddit.data.url,
+      nsfw: resultPerReddit.data.thumbnail === 'nsfw',
     });
   });
 }
@@ -226,10 +246,20 @@ function search(home, query, subReddits) {
   BPromise.all(BPromise.each(subReddits, subReddit =>
     utils.createDir(path.join(home, subReddit))
       .then(() => utils.createDir(path.join(home, subReddit, '2560x1440')))
+      .then(() => utils.createDir(path.join(home, subReddit, '2560x1440', 'normal')))
+      .then(() => utils.createDir(path.join(home, subReddit, '2560x1440', 'nsfw')))
       .then(() => utils.createDir(path.join(home, subReddit, '1920x1080')))
+      .then(() => utils.createDir(path.join(home, subReddit, '1920x1080', 'normal')))
+      .then(() => utils.createDir(path.join(home, subReddit, '1920x1080', 'nsfw')))
       .then(() => utils.createDir(path.join(home, subReddit, 'others')))
+      .then(() => utils.createDir(path.join(home, subReddit, 'others', 'normal')))
+      .then(() => utils.createDir(path.join(home, subReddit, 'others', 'nsfw')))
       .then(() => utils.createDir(path.join(home, subReddit, 'large')))
-      .then(() => utils.createDir(path.join(home, subReddit, 'temp')))))
+      .then(() => utils.createDir(path.join(home, subReddit, 'large', 'normal')))
+      .then(() => utils.createDir(path.join(home, subReddit, 'large', 'nsfw')))
+      .then(() => utils.createDir(path.join(home, subReddit, 'temp')))
+      .then(() => utils.createDir(path.join(home, subReddit, 'temp', 'normal')))
+      .then(() => utils.createDir(path.join(home, subReddit, 'temp', 'nsfw')))))
     .then(() => auth())
     .then(accessToken => redditSearch(home, accessToken, query, subReddits))
     .map(sourceListPerReddit => getImgFromResults(home, sourceListPerReddit))

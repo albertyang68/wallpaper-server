@@ -78,15 +78,15 @@ function requestAsync(options) {
 
 
 // Others
-function findFolderFromRes(width, height) {
+function findDestFolder(width, height, nsfw) {
   if ((width >= 2400 && width <= 2560) && (height >= 1300 && height <= 1640)) {
-    return BPromise.resolve('2560x1440');
+    return BPromise.resolve(path.join('2560x1440', nsfw ? 'nsfw' : 'normal'));
   } else if ((width >= 1800 && width <= 2020) && (height >= 900 && height <= 1280)) {
-    return BPromise.resolve('1920x1080');
+    return BPromise.resolve(path.join('1920x1080', nsfw ? 'nsfw' : 'normal'));
   } else if (width >= 2560 && height >= 1640) {
-    return BPromise.resolve('large');
+    return BPromise.resolve(path.join('large', nsfw ? 'nsfw' : 'normal'));
   }
-  return BPromise.resolve('others');
+  return BPromise.resolve(path.join('others', nsfw ? 'nsfw' : 'normal'));
 }
 
 function getResolutionPromise(filePath) {
@@ -120,7 +120,7 @@ module.exports = {
   requestAsync,
   isEmptyDir,
   writeToFile,
-  findFolderFromRes,
+  findDestFolder,
   getResolution,
   getResolutionPromise,
 };

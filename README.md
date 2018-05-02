@@ -28,3 +28,6 @@ Wallpaper
       * large
       * other
     * nsfw
+
+## Known bug
+* Need to delete all existing folder if config.subReddits is modified
