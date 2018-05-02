@@ -22,7 +22,9 @@ function init() {
 
 function start() {
   init()
-    .then(dir => reddit.search(dir, '2560x1440', config.reddit.subReddits))
+    .then(dir =>
+      BPromise.each(config.reddit.query, query =>
+        reddit.search(dir, query, config.reddit.subReddits)))
     .catch(err => console.error('ERROR start: ', err));
 }
 

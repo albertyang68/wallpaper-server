@@ -18,6 +18,10 @@
     "subReddits": [
       "wallpaper",
       "wallpapers"
+    ],
+    "query": [
+      "1440",
+      "1080"
     ]
   }
 }
