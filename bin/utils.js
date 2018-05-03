@@ -41,7 +41,9 @@ function deleteFile(filePath) {
 function createDir(folderPath) {
   return mkdir(folderPath)
     .tap(() => console.log(`LOG createDir done ${folderPath}`))
-    .catch(err => console.warn(`WARN createDir ${folderPath} ${err}`));
+    .catch((err) => {
+      // console.warn(`WARN createDir ${folderPath} ${err}`);
+    });
 }
 
 function readDir(folderPath) {

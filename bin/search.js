@@ -17,10 +17,10 @@ function init() {
       return utils.createDir(home);
     })
     .then(() => BPromise.resolve(home))
-    .catch(err => console.error('ERROR init: ', err));
+    .catch(err => console.error(`ERROR search init ${err}`));
 }
 
-function start() {
+function startSearch() {
   init()
     .then(dir =>
       BPromise.each(config.reddit.query, query =>
@@ -28,4 +28,11 @@ function start() {
     .catch(err => console.error('ERROR start: ', err));
 }
 
-start();
+function startBrowse() {
+  init()
+    .then(dir => reddit.browse(dir, config.reddit.subReddits))
+    .catch(err => console.error('ERROR start: ', err));
+}
+
+// startSearch();
+startBrowse();
