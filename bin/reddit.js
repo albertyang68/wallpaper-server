@@ -9,6 +9,7 @@ const config = require('../config.json');
 const reddit = config.reddit;
 
 let prevRun = {};
+let accessToken;
 
 function auth() {
   const user = reddit.user;
@@ -35,7 +36,8 @@ function auth() {
       }
 
       console.log(`LOG auth user:${user.userName} client:${user.clientId}`);
-      resolve(body && body.access_token);
+      accessToken = body && body.access_token;
+      resolve();
     });
   });
 }
@@ -49,9 +51,10 @@ function downloadFile(url, dest, fileName) {
           console.error(`ERROR downloadFile ${dest} ${fileName} ${err}`);
           reject(err);
         } else {
+          // TODO: Check mime.lookup and maybe remove everything that is not an image/*
           type = mime.extension(response.headers['content-type']);
-          if (type !== 'html' && response.statusCode < 400) {
-            utils.writeToFile(path.join(dest, `${fileName}`), body, 'binary')
+          if (response.headers['content-type'].includes('image') && response.statusCode < 400) {
+            utils.writeToFile(path.join(dest, `${fileName}.${type}`), body, 'binary')
               .then(() => resolve())
               .catch(error => console.error(`ERROR downloadFile writeFile ${dest} ${fileName} ${error}`));
           } else {
@@ -142,8 +145,11 @@ function getImgFromResults(dir, results) {
     .catch(err => console.error(`ERROR getImgFromResults ${err}`));
 }
 
-function writeLastResultId(home, subReddit, id) {
-  prevRun[subReddit] = id;
+function writeLastResult(home, subReddit, id, isFinish) {
+  prevRun[subReddit] = {
+    id,
+    isFinish,
+  };
 }
 
 function readPrevRun(home) {
@@ -162,11 +168,16 @@ function writePrevRun(home) {
   return utils.writeToFile(path.join(home, 'previous-run.json'), JSON.stringify(prevRun));
 }
 
+function filterUnfinishedSubReddits(prevRunResults, subReddits) {
+  return BPromise.filter(subReddits, subReddit =>
+    (prevRunResults[subReddit] ? !prevRunResults[subReddit].isFinish : true));
+}
+
 function parseResultChildren(home, subReddit, resultsPerReddit) {
   // Extract images array from each children
   return BPromise.map(resultsPerReddit, (resultPerReddit, index, length) => {
     if (index === length - 1) {
-      writeLastResultId(home, subReddit, `${resultPerReddit.kind}_${resultPerReddit.data.id}`);
+      writeLastResult(home, subReddit, `${resultPerReddit.kind}_${resultPerReddit.data.id}`, length < 100);
     }
 
     // Extract source from each images if from Reddit
@@ -183,7 +194,7 @@ function parseResultChildren(home, subReddit, resultsPerReddit) {
   });
 }
 
-function redditSearch(home, token, query, subReddits) {
+function redditSearch(home, subReddits, query) {
   return BPromise.map(subReddits, (subReddit) => {
     const queryParams = {
       q: query,
@@ -192,13 +203,13 @@ function redditSearch(home, token, query, subReddits) {
       limit: 100,
       sort: 'new',
       t: 'all',
-      after: prevRun[subReddit] || '',
+      after: (prevRun[subReddit] && prevRun[subReddit].id) || '',
     };
     const options = {
       method: 'GET',
       url: `${reddit.urls.oauth}/r/${subReddit}/search.json`,
       auth: {
-        bearer: token,
+        bearer: accessToken,
       },
       headers: {
         'User-Agent': 'wallpaper_server/0.1 by /u/yzq9652_test', // Required for 403 error
@@ -218,7 +229,7 @@ function redditSearch(home, token, query, subReddits) {
         }
 
         if (error || response.statusCode !== 200) {
-          console.error('Reddit redditSearch ', error);
+          console.error(`ERROR redditSearch ${options} ${subReddits} ${error}`);
           reject(error);
         }
         parseResultChildren(home, subReddit, body.data && body.data.children)
@@ -233,17 +244,17 @@ function redditSearch(home, token, query, subReddits) {
   });
 }
 
-function redditBrowse(home, token, subReddits) {
+function redditBrowse(home, subReddits) {
   return BPromise.map(subReddits, (subReddit) => {
     const queryParams = {
       limit: 100,
-      after: prevRun[subReddit] || '',
+      after: (prevRun[subReddit] && prevRun[subReddit].id) || '',
     };
     const options = {
       method: 'GET',
       url: `${reddit.urls.oauth}/r/${subReddit}.json`,
       auth: {
-        bearer: token,
+        bearer: accessToken,
       },
       headers: {
         'User-Agent': 'wallpaper_server/0.1 by /u/yzq9652_test', // Required for 403 error
@@ -263,7 +274,7 @@ function redditBrowse(home, token, subReddits) {
         }
 
         if (error || response.statusCode !== 200) {
-          console.error('Reddit redditSearch ', error);
+          console.error(`ERROR redditBrowse ${options} ${subReddits} ${error}`);
           reject(error);
         }
         parseResultChildren(home, subReddit, body.data && body.data.children)
@@ -296,33 +307,30 @@ function init(home, subReddits) {
       .then(() => utils.createDir(path.join(home, subReddit, 'temp')))
       .then(() => utils.createDir(path.join(home, subReddit, 'temp', 'normal')))
       .then(() => utils.createDir(path.join(home, subReddit, 'temp', 'nsfw')))))
-    .then(() => readPrevRun(home))
     .then(() => auth())
+    .then(() => readPrevRun(home))
+    .then(prevRunResults => filterUnfinishedSubReddits(prevRunResults, subReddits))
     .catch(err => console.error(`ERROR reddit init ${err}`));
 }
 
-function search(home, query, subReddits) {
+function start(home, subReddits, action = 'search', query = ['1080']) {
+  let unFinishedSubReddits;
   init(home, subReddits)
-    .then(accessToken => redditSearch(home, accessToken, query, subReddits))
+    .then((filteredSubReddits) => {
+      unFinishedSubReddits = filteredSubReddits;
+      if (action === 'browse') {
+        return redditBrowse(home, unFinishedSubReddits);
+      }
+      return redditSearch(home, unFinishedSubReddits, query);
+    })
     .map(sourceListPerReddit => getImgFromResults(home, sourceListPerReddit))
-    .then(() => relocateImages(home, subReddits))
-    .then(() => removeInvalidImg(home, subReddits))
+    .then(() => relocateImages(home, unFinishedSubReddits))
+    .then(() => removeInvalidImg(home, unFinishedSubReddits))
     .then(() => writePrevRun(home))
-    .catch(err => console.error(`ERROR search ${err}`));
-}
-
-function browse(home, subReddits) {
-  init(home, subReddits)
-    .then(accessToken => redditBrowse(home, accessToken, subReddits))
-    .map(sourceListPerReddit => getImgFromResults(home, sourceListPerReddit))
-    .then(() => relocateImages(home, subReddits))
-    .then(() => removeInvalidImg(home, subReddits))
-    .then(() => writePrevRun(home))
-    .catch(err => console.error(`ERROR search ${err}`));
+    .catch(err => console.error(`ERROR ${action} ${err}`));
 }
 
 module.exports = {
   auth,
-  browse,
-  search,
+  start,
 };

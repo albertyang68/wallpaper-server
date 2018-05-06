@@ -9,7 +9,8 @@ A simple node app running in the server intended to pull sources from reddit and
 3. Fill `reddit.user` with self credentials
     * `clientId` - Line under `personal use script`
     * `clientSecret` - Red line
-4. Run `search.js`
+4. `npm install`
+5. `node bin/search.js`
 
 ## Change log
 Version 0.1: (plan) 
@@ -21,7 +22,7 @@ Version 0.2: (plan)
 
 ## Folder structure
 wallpaper-server
-  * reddit
+  * subRedditName
       * 1920x1080
         * normal
         * nsfw

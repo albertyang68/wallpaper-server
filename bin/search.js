@@ -24,13 +24,13 @@ function startSearch() {
   init()
     .then(dir =>
       BPromise.each(config.reddit.query, query =>
-        reddit.search(dir, query, config.reddit.subReddits)))
+        reddit.start(dir, config.reddit.subReddits, 'search', query)))
     .catch(err => console.error('ERROR start: ', err));
 }
 
 function startBrowse() {
   init()
-    .then(dir => reddit.browse(dir, config.reddit.subReddits))
+    .then(dir => reddit.start(dir, config.reddit.subReddits, 'browse'))
     .catch(err => console.error('ERROR start: ', err));
 }
 
